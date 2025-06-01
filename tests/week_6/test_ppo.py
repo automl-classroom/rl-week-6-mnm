@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 # Adjust import as needed
-from rl_exercises.week_6 import PPOAgent
+from rl_exercises.week_6.ppo import PPOAgent
 
 
 class DummyEnv(gym.Env):

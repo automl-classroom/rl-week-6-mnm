@@ -163,15 +163,29 @@ class ActorCriticAgent(AbstractAgent):
             Discounted returns.
         """
         # TODO: convert rewards into discounted returns
+        T = len(rewards)
+        returns = [0.0] * T
+        G = 0
+        for t in reversed(range(T)):
+            G = rewards[t] + G * self.gamma
+            returns[t] = G
+        returns = torch.tensor(returns, dtype=torch.float32)
 
         # TODO: convert states list into a torch batch and compute state-values
+        values = self.value_fn(
+            torch.stack([torch.from_numpy(s).float() for s in states])
+        )
 
         # TODO: compute raw advantages = returns - values
+        advantages = returns - values
 
         # TODO: normalize advantages to zero mean and unit variance and use 1e-8 for numerical stability
+        advantages_mean = advantages - advantages.mean()
+        advantages_std = advantages.std(unbiased=False) + 1e-8
+        advantages = advantages_mean / advantages_std
 
         # return normalized advantages and returns
-        return None
+        return advantages, returns
 
     def compute_gae(
         self,
@@ -203,18 +217,46 @@ class ActorCriticAgent(AbstractAgent):
         """
 
         # TODO: compute values and next_values using your value_fn
+        values = self.value_fn(
+            torch.stack([torch.from_numpy(s).float() for s in states])
+        )
 
+        next_values = self.value_fn(
+            torch.stack([torch.from_numpy(s).float() for s in next_states])
+        )
         # TODO: compute deltas: one-step TD errors
+        rewards = torch.tensor(rewards, dtype=torch.float32)
+        dones_tensor = torch.tensor(dones, dtype=torch.float32)
+
+        deltas = (
+            rewards
+            + self.gamma * next_values.squeeze() * (1 - dones_tensor)
+            - values.squeeze()
+        )
 
         # TODO: accumulate GAE advantages backwards
+        gae_advantage = 1
+        gae_advantages = []
+        for t in reversed(range(len(deltas))):
+            terminated_mask = 1 - dones_tensor[t]
+            gae_advantage = (
+                deltas[t]
+                + self.gamma * self.gae_lambda * gae_advantage * terminated_mask
+            )
+            gae_advantages.insert(0, gae_advantage)
+        gae_advantages = torch.stack(gae_advantages)
 
         # TODO: compute returns using advantages and values
+        gae_returns = gae_advantages + values.squeeze()
 
         # TODO: normalize advantages to zero mean and unit variance and use 1e-8 for numerical stability
+        gae_advantages_mean = gae_advantages - gae_advantages.mean()
+        gae_advantages_std = gae_advantages.std(unbiased=False) + 1e-8
+        gae_advantages = gae_advantages_mean / gae_advantages_std
 
         # TODO: advantages, returns  # replace with actual values (detach both to avoid re-entering the graph)
 
-        return None
+        return gae_advantages, gae_returns
 
     def update_agent(
         self,
@@ -250,16 +292,24 @@ class ActorCriticAgent(AbstractAgent):
             ret = self.compute_returns(list(rewards))
 
             # TODO: compute advantages by subtracting running return
-            adv = ...
+            adv = ret - self.running_return
 
             # TODO: normalize advantages to zero mean and unit variance and use 1e-8 for numerical stability
             # (Reminder, use unbiased=False for torch tensors)
+            adv_mean = adv.mean()
+            adv_std = adv.std(unbiased=False) + 1e-8
+            adv = (adv - adv_mean) / adv_std
 
             # TODO: update running return using baseline decay
-            # (x = baseline_decay * x + (1 - baseline_decay) * mean return)
+            self.running_return = (
+                self.baseline_decay * self.running_return
+                + (1 - self.baseline_decay) * ret.mean()
+            )
         else:
             ret = self.compute_returns(list(rewards))
             adv = (ret - ret.mean()) / (ret.std(unbiased=False) + 1e-8)
+
+        adv = adv.detach()
 
         # policy update
         logp_t = torch.stack(log_probs)

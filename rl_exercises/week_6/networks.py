@@ -70,6 +70,9 @@ class ValueNetwork(nn.Module):  # critic network
         # TODO: implement the value network
         # as a simple MLP with one hidden layer
         # and ReLU activation
+        self.input_layer = nn.Linear(self.state_dim, hidden_size)
+        self.relu = nn.ReLU()
+        self.hidden_layer = nn.Linear(hidden_size, 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -87,4 +90,6 @@ class ValueNetwork(nn.Module):  # critic network
         """
         # TODO: implement the forward pass
 
-        return 0.0  # TODO: replace with your value network output
+        output = self.hidden_layer(self.relu(self.input_layer(x))).squeeze(-1)
+
+        return output  # TODO: replace with your value network output

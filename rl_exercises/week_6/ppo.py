@@ -21,10 +21,7 @@ import random  # noqa: E402
 import hydra  # noqa: E402
 from omegaconf import DictConfig  # noqa: E402
 from rl_exercises.agent import AbstractAgent  # noqa: E402
-from rl_exercises.week_6.networks import (  # noqa: E402
-    Policy,
-    ValueNetwork,
-)
+from rl_exercises.week_6.networks import Policy, ValueNetwork  # noqa: E402
 
 
 def set_seed(env: gym.Env, seed: int = 0) -> None:
